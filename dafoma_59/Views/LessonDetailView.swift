@@ -12,6 +12,10 @@ struct LessonDetailView: View {
     @ObservedObject var viewModel: LanguageViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var currentSection = 0 // 0: vocabulary, 1: dialogue, 2: exercises
+    @State private var currentVocabularyIndex = 0
+    @State private var currentDialogueIndex = 0
+    @State private var currentDialogueLineIndex = 0
+    @State private var lessonProgress: Double = 0.0
     
     var body: some View {
         NavigationView {
@@ -24,7 +28,7 @@ struct LessonDetailView: View {
                     headerView
                     
                     // Progress Bar
-                    ProgressBarView(progress: viewModel.lessonProgress)
+                    ProgressBarView(progress: lessonProgress)
                         .padding(.horizontal, 20)
                         .padding(.bottom, 15)
                     
@@ -39,8 +43,37 @@ struct LessonDetailView: View {
         .navigationViewStyle(StackNavigationViewStyle())
         .preferredColorScheme(.dark)
         .onAppear {
-            viewModel.startLesson(lesson)
+            initializeLesson()
         }
+    }
+    
+    private func initializeLesson() {
+        // Initialize local state
+        currentVocabularyIndex = 0
+        currentDialogueIndex = 0
+        currentDialogueLineIndex = 0
+        lessonProgress = 0.0
+        
+        // Set the current lesson in viewModel
+        viewModel.currentLesson = lesson
+        
+        // Ensure language is selected
+        if viewModel.selectedLanguage?.code != lesson.languageCode {
+            viewModel.selectLanguage(code: lesson.languageCode)
+        }
+        
+        updateProgress()
+    }
+    
+    private func updateProgress() {
+        let totalItems = lesson.vocabulary.count + lesson.dialogues.reduce(0) { $0 + $1.lines.count }
+        guard totalItems > 0 else { return }
+        
+        let completedVocabulary = currentVocabularyIndex
+        let completedDialogueLines = lesson.dialogues.prefix(currentDialogueIndex).reduce(0) { $0 + $1.lines.count } + currentDialogueLineIndex
+        
+        let completedItems = completedVocabulary + completedDialogueLines
+        lessonProgress = Double(completedItems) / Double(totalItems)
     }
     
     private var headerView: some View {
@@ -93,8 +126,10 @@ struct LessonDetailView: View {
     
     private var sectionTitle: String {
         switch currentSection {
-        case 0: return "Vocabulary (\(viewModel.currentVocabularyIndex + 1)/\(lesson.vocabulary.count))"
-        case 1: return "Dialogue (\(viewModel.currentDialogueIndex + 1)/\(lesson.dialogues.count))"
+        case 0: 
+            return "Vocabulary (\(currentVocabularyIndex + 1)/\(lesson.vocabulary.count))"
+        case 1: 
+            return "Dialogue (\(currentDialogueIndex + 1)/\(lesson.dialogues.count))"
         case 2: return "Practice"
         default: return ""
         }
@@ -122,16 +157,34 @@ struct LessonDetailView: View {
     
     private var vocabularyContent: some View {
         VStack(spacing: 20) {
-            if let item = viewModel.getCurrentVocabularyItem() {
+            if !lesson.vocabulary.isEmpty {
+                let safeIndex = max(0, min(currentVocabularyIndex, lesson.vocabulary.count - 1))
+                let item = lesson.vocabulary[safeIndex]
                 VocabularyDetailCard(item: item, viewModel: viewModel)
+            } else {
+                Text("No vocabulary available")
+                    .foregroundColor(.white)
+                    .font(.title2)
+                    .padding(.vertical, 50)
             }
         }
     }
     
     private var dialogueContent: some View {
         VStack(spacing: 20) {
-            if let dialogue = viewModel.getCurrentDialogue() {
-                DialogueDetailView(dialogue: dialogue, viewModel: viewModel)
+            if !lesson.dialogues.isEmpty {
+                let safeIndex = max(0, min(currentDialogueIndex, lesson.dialogues.count - 1))
+                let dialogue = lesson.dialogues[safeIndex]
+                DialogueDetailView(
+                    dialogue: dialogue, 
+                    currentLineIndex: $currentDialogueLineIndex,
+                    viewModel: viewModel
+                )
+            } else {
+                Text("No dialogue available")
+                    .foregroundColor(.white)
+                    .font(.title2)
+                    .padding(.vertical, 50)
             }
         }
     }
@@ -218,25 +271,30 @@ struct LessonDetailView: View {
     
     private var canGoPrevious: Bool {
         switch currentSection {
-        case 0: return viewModel.currentVocabularyIndex > 0
-        case 1: return viewModel.currentDialogueIndex > 0 || viewModel.currentDialogueLineIndex > 0
-        default: return true
+        case 0: return currentVocabularyIndex > 0
+        case 1: return currentDialogueIndex > 0 || currentDialogueLineIndex > 0
+        case 2: return true
+        default: return false
         }
     }
     
     private var nextButtonTitle: String {
         switch currentSection {
         case 0:
-            if viewModel.currentVocabularyIndex < lesson.vocabulary.count - 1 {
+            if currentVocabularyIndex < lesson.vocabulary.count - 1 {
                 return "Next"
             } else {
                 return lesson.dialogues.isEmpty ? "Complete" : "Dialogue"
             }
         case 1:
-            let dialogue = viewModel.getCurrentDialogue()
-            if viewModel.currentDialogueLineIndex < (dialogue?.lines.count ?? 0) - 1 ||
-               viewModel.currentDialogueIndex < lesson.dialogues.count - 1 {
-                return "Next"
+            if !lesson.dialogues.isEmpty && currentDialogueIndex < lesson.dialogues.count {
+                let dialogue = lesson.dialogues[currentDialogueIndex]
+                if currentDialogueLineIndex < dialogue.lines.count - 1 ||
+                   currentDialogueIndex < lesson.dialogues.count - 1 {
+                    return "Next"
+                } else {
+                    return "Complete"
+                }
             } else {
                 return "Complete"
             }
@@ -250,11 +308,22 @@ struct LessonDetailView: View {
     private func previousAction() {
         switch currentSection {
         case 0:
-            viewModel.previousVocabularyItem()
+            if currentVocabularyIndex > 0 {
+                currentVocabularyIndex -= 1
+                updateProgress()
+            }
         case 1:
-            viewModel.previousDialogueLine()
+            if currentDialogueLineIndex > 0 {
+                currentDialogueLineIndex -= 1
+            } else if currentDialogueIndex > 0 {
+                currentDialogueIndex -= 1
+                if !lesson.dialogues.isEmpty && currentDialogueIndex < lesson.dialogues.count {
+                    currentDialogueLineIndex = lesson.dialogues[currentDialogueIndex].lines.count - 1
+                }
+            }
+            updateProgress()
         case 2:
-            currentSection = 1
+            currentSection = lesson.dialogues.isEmpty ? 0 : 1
         default:
             break
         }
@@ -263,8 +332,9 @@ struct LessonDetailView: View {
     private func nextAction() {
         switch currentSection {
         case 0:
-            if viewModel.currentVocabularyIndex < lesson.vocabulary.count - 1 {
-                viewModel.nextVocabularyItem()
+            if currentVocabularyIndex < lesson.vocabulary.count - 1 {
+                currentVocabularyIndex += 1
+                updateProgress()
             } else {
                 currentSection = lesson.dialogues.isEmpty ? 2 : 1
                 if currentSection == 2 {
@@ -272,13 +342,18 @@ struct LessonDetailView: View {
                 }
             }
         case 1:
-            let dialogue = viewModel.getCurrentDialogue()
-            if viewModel.currentDialogueLineIndex < (dialogue?.lines.count ?? 0) - 1 ||
-               viewModel.currentDialogueIndex < lesson.dialogues.count - 1 {
-                viewModel.nextDialogueLine()
-            } else {
-                currentSection = 2
-                viewModel.completeLesson()
+            if !lesson.dialogues.isEmpty && currentDialogueIndex < lesson.dialogues.count {
+                let currentDialogue = lesson.dialogues[currentDialogueIndex]
+                if currentDialogueLineIndex < currentDialogue.lines.count - 1 {
+                    currentDialogueLineIndex += 1
+                } else if currentDialogueIndex < lesson.dialogues.count - 1 {
+                    currentDialogueIndex += 1
+                    currentDialogueLineIndex = 0
+                } else {
+                    currentSection = 2
+                    viewModel.completeLesson()
+                }
+                updateProgress()
             }
         case 2:
             dismiss()
@@ -366,6 +441,7 @@ struct VocabularyDetailCard: View {
 
 struct DialogueDetailView: View {
     let dialogue: Dialogue
+    @Binding var currentLineIndex: Int
     @ObservedObject var viewModel: LanguageViewModel
     
     var body: some View {
@@ -391,7 +467,9 @@ struct DialogueDetailView: View {
             )
             
             // Current Dialogue Line
-            if let currentLine = viewModel.getCurrentDialogueLine() {
+            if !dialogue.lines.isEmpty {
+                let safeIndex = max(0, min(currentLineIndex, dialogue.lines.count - 1))
+                let currentLine = dialogue.lines[safeIndex]
                 DialogueLineDetailView(line: currentLine, viewModel: viewModel)
             }
             
@@ -405,7 +483,7 @@ struct DialogueDetailView: View {
                 ForEach(Array(dialogue.lines.enumerated()), id: \.element.id) { index, line in
                     DialogueContextLine(
                         line: line,
-                        isCurrentLine: index == viewModel.currentDialogueLineIndex,
+                        isCurrentLine: index == currentLineIndex,
                         viewModel: viewModel
                     )
                 }
@@ -537,8 +615,31 @@ struct DialogueContextLine: View {
             description: "Learn essential greetings",
             languageCode: "es",
             lessonNumber: 1,
-            vocabulary: [],
-            dialogues: [],
+            vocabulary: [
+                VocabularyItem(
+                    word: "Hola",
+                    translation: "Hello",
+                    pronunciation: "OH-lah",
+                    audioURL: nil,
+                    example: "Hola, ¿cómo estás?",
+                    exampleTranslation: "Hello, how are you?"
+                )
+            ],
+            dialogues: [
+                Dialogue(
+                    title: "Basic Greeting",
+                    scenario: "Meeting someone",
+                    participants: ["Alex", "Maria"],
+                    lines: [
+                        DialogueLine(
+                            speaker: "Alex",
+                            text: "Hola",
+                            translation: "Hello",
+                            audioURL: nil
+                        )
+                    ]
+                )
+            ],
             exercises: [],
             isCompleted: false,
             difficulty: .beginner
@@ -546,3 +647,4 @@ struct DialogueContextLine: View {
         viewModel: LanguageViewModel()
     )
 }
+

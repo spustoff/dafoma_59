@@ -370,3 +370,4 @@ class DataService: ObservableObject {
         return exercises
     }
 }
+

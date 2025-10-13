@@ -58,6 +58,11 @@ class LanguageViewModel: ObservableObject {
         isLessonCompleted = false
         earnedPoints = 0
         
+        // Ensure we have the language selected for this lesson
+        if selectedLanguage?.code != lesson.languageCode {
+            selectLanguage(code: lesson.languageCode)
+        }
+        
         updateProgress()
     }
     
@@ -123,6 +128,7 @@ class LanguageViewModel: ObservableObject {
     
     func getCurrentVocabularyItem() -> VocabularyItem? {
         guard let lesson = currentLesson,
+              !lesson.vocabulary.isEmpty,
               currentVocabularyIndex < lesson.vocabulary.count else { return nil }
         
         return lesson.vocabulary[currentVocabularyIndex]
@@ -174,6 +180,7 @@ class LanguageViewModel: ObservableObject {
     
     func getCurrentDialogue() -> Dialogue? {
         guard let lesson = currentLesson,
+              !lesson.dialogues.isEmpty,
               currentDialogueIndex < lesson.dialogues.count else { return nil }
         
         return lesson.dialogues[currentDialogueIndex]
@@ -316,3 +323,4 @@ struct LanguageStatistics {
         }
     }
 }
+

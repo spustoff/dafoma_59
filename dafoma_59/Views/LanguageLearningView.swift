@@ -28,17 +28,11 @@ struct LanguageLearningView: View {
                     
                     // Content
                     TabView(selection: $selectedTab) {
-                        lessonsView
+                        dialoguesView
                             .tag(0)
                         
-                        vocabularyView
-                            .tag(1)
-                        
-                        dialoguesView
-                            .tag(2)
-                        
                         progressView
-                            .tag(3)
+                            .tag(1)
                     }
                     .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                 }
@@ -91,7 +85,7 @@ struct LanguageLearningView: View {
     
     private var tabSelector: some View {
         HStack(spacing: 0) {
-            ForEach(0..<4) { index in
+            ForEach(0..<2) { index in
                 Button(action: {
                     selectedTab = index
                 }) {
@@ -121,9 +115,8 @@ struct LanguageLearningView: View {
     private func tabIcon(for index: Int) -> String {
         switch index {
         case 0: return "book.fill"
-        case 1: return "textbook.fill"
-        case 2: return "bubble.left.and.bubble.right.fill"
-        case 3: return "chart.bar.fill"
+        case 1: return "bubble.left.and.bubble.right.fill"
+        case 2: return "chart.bar.fill"
         default: return "circle"
         }
     }
@@ -131,9 +124,8 @@ struct LanguageLearningView: View {
     private func tabTitle(for index: Int) -> String {
         switch index {
         case 0: return "Lessons"
-        case 1: return "Vocabulary"
-        case 2: return "Dialogues"
-        case 3: return "Progress"
+        case 1: return "Dialogues"
+        case 2: return "Progress"
         default: return ""
         }
     }
@@ -157,18 +149,6 @@ struct LanguageLearningView: View {
         }
     }
     
-    // MARK: - Vocabulary View
-    private var vocabularyView: some View {
-        ScrollView {
-            LazyVStack(spacing: 15) {
-                ForEach(viewModel.lessons) { lesson in
-                    VocabularySection(lesson: lesson, viewModel: viewModel)
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 10)
-        }
-    }
     
     // MARK: - Dialogues View
     private var dialoguesView: some View {
@@ -637,3 +617,4 @@ struct DifficultyBadge: View {
 #Preview {
     LanguageLearningView()
 }
+
