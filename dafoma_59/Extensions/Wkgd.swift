@@ -1,11 +1,13 @@
 //
-//  Wkgs.swift
-//  dafoma_58
+//  Wkgd.swift
+//  dafoma_57
 //
-//  Created by Вячеслав on 10/9/25.
+//  Created by Вячеслав on 10/6/25.
 //
 
+
 import SwiftUI
+import Combine
 import WebKit
 
 struct WebSystem: View {
@@ -45,7 +47,7 @@ class WController: UIViewController, WKNavigationDelegate, WKUIDelegate {
     
     private func getRequest() {
         
-        guard let url = URL(string: DataManager().server) else { return }
+        guard let url = URL(string: DataManagers().server) else { return }
         self.url_link = url
         self.getInfo()
     }
